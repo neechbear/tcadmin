@@ -471,7 +471,11 @@ function main() {
     exit 0
   fi
 
-  execute_soap_query "$@"
+  if type -p sed >/dev/null 2>&2 ; then
+    execute_soap_query "$@" | sed -e :a -e '/./,$!d;/^\n*$/{$d;N;};/\n$/ba'
+  else
+    execute_soap_query "$@"
+  fi
 }
 
 # Only run main function if we're executed directly.
