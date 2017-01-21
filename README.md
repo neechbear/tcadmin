@@ -17,14 +17,79 @@ This script requires that you have the worldserver SOAP RPC API enabled, and tha
 ## Example Usage
 
 ```
+nicolaw@qp:~$ tcadmin --version
+tcadmin v1.0
+nicolaw@qp:~$
+```
+
+```
 nicolaw@qp:~$ tcadmin lookup item Shadowmourn
 50815 - Shadowmourne Monster Offhand
 49623 - Shadowmourne
+nicolaw@qp:~$
+```
 
+```
 nicolaw@qp:~$ tcadmin my_silly_invalid_command
 /SOAP-ENV:Envelope/SOAP-ENV:Body/ns1:executeCommandResponse/result=There is no such command
-nicolaw@qp:~$ tcadmin --version
-tcadmin v1.0
+nicolaw@qp:~$
+```
+
+```
+nicolaw@qp:~$ tcadmin lookup item love | grep -vi glove
+50250 - Big Love Rocket
+49943 - Lovely Silvermoon City Card
+49941 - Lovely Thunder Bluff Card
+49937 - Lovely Undercity Card
+49939 - Lovely Orgrimmar Card
+49942 - Lovely Exodar Card
+49938 - Lovely Darnassus Card
+51804 - Winking Eye of Love
+50320 - Faded Lovely Greeting Card
+49940 - Lovely Ironforge Card
+49936 - Lovely Stormwind Card
+49927 - Love Token
+49916 - Lovely Charm Bracelet
+50196 - Love's Prisoner
+37467 - A Steamy Romance Novel: Forbidden Love
+37169 - War Mace of Unrequited Love
+36901 - Goldclover
+34258 - Love Rocket
+22280 - Lovely Purple Dress
+22279 - Lovely Black Dress
+22278 - Lovely Blue Dress
+22276 - Lovely Red Dress
+22261 - Love Fool
+21815 - Love Token
+21032 - Meridith's Love Letter
+14679 - Of Love and Family
+51943 - Halion, Staff of Forgotten Love
+51799 - Halion, Staff of Forgotten Love
+50163 - Lovely Rose
+50160 - Lovely Dress Box
+49715 - Forever-Lovely Rose
+49661 - Lovely Charm Collector's Kit
+49655 - Lovely Charm
+49641 - Faded Lovely Greeting Card
+7128 - Uncloven Satyr Hoof
+45468 - Leggings of Lost Love
+5869 - Cloven Hoof
+42438 - Lovely Cake
+42434 - Lovely Cake Slice
+1208 - Maybell's Love Letter
+nicolaw@qp:~$ tcadmin send
+Incorrect syntax.
+The command  uses the following subcommands:
+    items
+    mail
+    message
+    money
+nicolaw@qp:~$ tcadmin send items Frith "Love You" "Love the Frith millions. XXXXX" 21815:5 50163:1 42438:3 22280:1
+Syntax: .send items #playername "#subject" "#text" itemid1[:count1] itemid2[:count2] ... itemidN[:countN]
+
+Send a mail to a player. Subject and mail text must be in "". If for itemid not provided related count values then expected 1, if count > max items in stack then items will be send in required amount stacks. All stacks amount in mail limited to 12.
+nicolaw@qp:~$ tcadmin send items Frith '"Love You"' '"Love the Frith millions. XXXXX"' 21815:5 50163:1 42438:3 22280:1
+Mail sent to Frith
 nicolaw@qp:~$
 ```
 
