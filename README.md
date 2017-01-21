@@ -8,7 +8,7 @@ This script requires that you have the worldserver SOAP RPC API enabled, and tha
  * Make command help only display help for commands that you have permissions to execute.
  * Attempt to pull command help from SOAP RPC API before trying MySQL query, before falling back to hard-coded internal list.
  * Make sub-command help display if you enter incorrect syntax or invalid arguments.
- * Write bash autocompletion so that you can build a full command line with tab completion that looks up commands, subcommands, players, items, spells etc for you.
+ * Improve bash autocompletion to understand command arguments in order to perform context sensitive spell, item and skill ID lookups etc for you.
  * Try and remove `xml2` and `sed` dependency.
  * Document use of the script as a library (which is already possible simply by sourcing the script from another bash script and calling the appropriate functions yourself).
  * Document some interesting examples of use from your crontab.
