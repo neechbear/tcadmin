@@ -18,6 +18,50 @@ This script requires that you have the worldserver SOAP RPC API enabled, and tha
 
 To enable the bash shell tab auto-completion functionality for the `tcadmin` command, simply copy the `bash-completion.sh` to `/usr/share/bash-completion/completions/tcadmin`.
 
+```
+nicolaw@qp:~$ tcadmin
+Display all 106 possibilities? (y or n)
+account           cooldown          guild             nameannounce      setskill
+achievement       damage            help              neargrave         showarea
+additem           debug             hidearea          notify            summon
+additemset        demorph           honor             npc               tele
+ahbot             deserter          instance          pdump             ticket
+announce          dev               itemmove          pet               titles
+appear            die               kick              pinfo             unaura
+arena             disable           learn             playall           unban
+aura              dismount          levelup           possess           unbindsight
+ban               distance          lfg               pvpstats          unfreeze
+baninfo           event             linkgrave         quest             unlearn
+bank              flusharenapoints  list              rbac              unmute
+banlist           freeze            listfreeze        recall            unpossess
+bf                gm                lookup            reload            unstuck
+bindsight         gmannounce        mailbox           repairitems       wchange
+cast              gmnameannounce    maxskill          reset             whispers
+channel           gmnotify          mmap              respawn           wp
+character         go                modify            revive            wpgps
+cheat             gobject           morph             save
+combatstop        gps               movegens          saveall
+cometome          group             mute              send
+commands          guid              mutehistory       server
+nicolaw@qp:~$ tcadmin s
+save      saveall   send      server    setskill  showarea  summon
+nicolaw@qp:~$ tcadmin se
+send      server    setskill
+nicolaw@qp:~$ tcadmin server
+corpses       idlerestart   info          plimit        set
+exit          idleshutdown  motd          restart       shutdown
+nicolaw@qp:~$ tcadmin server s
+set       shutdown
+nicolaw@qp:~$ tcadmin server shutdown
+cancel  force
+nicolaw@qp:~$ tcadmin server shutdown force
+Syntax: .server shutdown [force] #delay [#exit_code] [reason]
+
+Shut the server down after #delay seconds. Use #exit_code or 0 as program exit code. Specify 'force' to allow short-term shutdown despite other players being connected.
+nicolaw@qp:~$ tcadmin server shutdown force 0 0 example
+nicolaw@qp:~$
+```
+
 ## Example Usage
 
 ```
