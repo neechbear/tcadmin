@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Trinity Core worldserver administrative command line OAP interface.
+# Trinity Core worldserver administrative command line SOAP interface.
 #
 # This script relies on the curl and xml2 commands, and optionally mysql.
 #
