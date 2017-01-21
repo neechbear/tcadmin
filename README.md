@@ -14,6 +14,10 @@ This script requires that you have the worldserver SOAP RPC API enabled, and tha
  * Document some interesting examples of use from your crontab.
  * Remove ^M characters from database output.
 
+## Bash Tab Auto-Completion
+
+To enable the bash shell tab auto-completion functionality for the `tcadmin` command, simply copy the `bash-completion.sh` to `/usr/share/bash-completion/completions/tcadmin`.
+
 ## Example Usage
 
 ```

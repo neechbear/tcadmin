@@ -6,8 +6,8 @@
 #
 # Author: Nicola Worthington
 #         <nicolaw@tfb.net>
-#         https://nicolaw.uk
-#         https://github.com/neechbear
+#         https://nicolaw.uk/tcadmin
+#         https://github.com/neechbear/tcadmin
 #
 # MIT License
 #
@@ -31,6 +31,10 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 #
+
+# Explicitly define our identity instead of using $0 which is unsafe since we
+# may also be invoked as a sourced library.
+declare PROG="tcadmin"
 
 # Define default database values.
 declare TCDBHOST_DEFAULT="localhost"
@@ -76,20 +80,20 @@ fi
 
 # Source in default configuration files if readable. These are intended for
 # administrators or users to overload the the above default variables.
-if [[ -r "/etc/default/${0##*/}" ]] ; then
+if [[ -r "/etc/default/$PROG" ]] ; then
   # /etc/default/tcadmin
-  source "/etc/default/${0##*/}"
+  source "/etc/default/$PROG"
 fi
-if [[ -r ~/."${0##*/}.cnf" ]] ; then
+if [[ -r ~/."$PROG.cnf" ]] ; then
   # ~/.tcadmin.cnf
-  source ~/."${0##*/}.cnf"
+  source ~/."$PROG.cnf"
 fi
 
 function print_usage() {
   cat <<EOM
-${0##*/} - Trinity Core World Server Administration Tool
+$PROG - Trinity Core World Server Administration Tool
 
-Usage: ${0##*/} [db_args] [soap_args] <--help|--version|command> [options]
+Usage: $PROG [db_args] [soap_args] <--help|--version|command> [options]
 
 DB Arguments:
   Optional arguments to specify Trinity Core database paramaters. These are
@@ -98,10 +102,10 @@ DB Arguments:
 
   --dbhost=<host>     Specify database hostname or IP.  Defaults to
                       '$TCDBHOST_DEFAULT' or \$TCDBHOST environment variable.
-                    
+
   --dbport=<port>     Specify database TCP port number.  Defaults to
                       '$TCDBPORT_DEFAULT' or \$TCDBPORT environment variable.
-                    
+
   --dbuser=<user>     Specify database username.  Defaults to
                       '$TCDBUSER_DEFAULT' or \$TCDBUSER environment variable.
 
@@ -120,10 +124,10 @@ SOAP Arguments:
 
   --soaphost=<host>   Specify SOAP RPC API hostname or IP.  Defaults to
                       '$TCSOAPHOST_DEFAULT' or \$TCSOAPHOST environment variable.
-                    
+
   --soapport=<port>   Specify SOAP RPC API TCP port number.  Defaults to
                       '$TCSOAPPORT_DEFAULT' or \$TCSOAPPORT environment variable.
-                    
+
   --soapuser=<user>   Specify SOAP RPC API username.  Defaults to
                       '$TCSOAPUSER_DEFAULT' or \$TCSOAPUSER environment variable.
 
@@ -139,7 +143,7 @@ SOAP Arguments:
   configure access.
 
 Commands:
-$(print_commands_usage) 
+$(print_commands_usage)
 
 Configuring Database Credentials:
   To grant the minimal required read-only (SELECT) database permissions, modify
@@ -170,8 +174,8 @@ Environment Variables:
   line (see "DB Arguments" and "SOAP Arguments" above).
 
 Configuration Files:
-  /etc/default/${0##*/}
-  ~/.${0##*/}.cnf
+  /etc/default/$PROG
+  ~/.$PROG.cnf
 
 For additional support and bug reports, please contact the author Nicola
 Worthington at <nicolaw@tfb.net>.
@@ -182,29 +186,52 @@ https://trinitycore.atlassian.net/wiki/display/tc/Server+Setup.
 EOM
 }
 
-function print_commands_usage() {
-  local c_sect=""
-  local c_count=0
+function get_filtered_subcommands() {
+  local filter="${*:-}"
+  if [[ -z "${filter%% }" ]] ; then
+    get_available_commands
+    return $?
+  fi
 
-  # TODO: Improve this to restrict the SQL select to only return those commands
-  #       that are actually permitted by the SOAP RPC API user in question.
+  local commands="$(get_available_commands)"
+  local crop=""
+  if [[ "$filter" =~ [^[:space:]][[:space:]][^[:space:]] ]] ; then
+    crop="${filter% *}"
+  fi
+
   while read -r line ; do
-    if [[ "$line" =~ \*\*\*\ [0-9]+\.\ row\ \*\*\* ]] ; then
-      if [[ "$c_sect" == "help" ]] ; then
-        echo ""
-      fi
-      c_sect=""
-    elif [[ "$line" =~ ^name:\ (.+) ]] ; then
-      echo "  ${BASH_REMATCH[1]}"
-      c_count=$(( c_count + 1 ))
-    elif [[ "$line" =~ ^help:\ (.+) ]] ; then
-      c_sect="help"
-      echo "    ${BASH_REMATCH[1]}"
-    elif [[ -n "$line" && "$line" =~ [a-zA-Z0-9] ]] ; then
-      echo "    ${line## }"
+    if [[ "$line" == "${filter%% }" ]] ; then
+      crop="${filter%% }"
+      break
     fi
-  done < <(
-    mysql \
+  done < <(echo "$commands")
+
+  local out=""
+  while read -r line ; do
+    [[ "$line" =~ ^${filter%% } ]] || continue
+    out="${line#$crop}"
+    out="${out## }"
+    if [[ -n "$out" ]] ; then
+      echo "$out"
+    fi
+  done < <(echo "$commands")
+}
+
+function get_available_commands() {
+  if [[ "${1:-}" == "fallback" ]] ; then
+    get_fallback_commands
+    return $?
+  fi
+
+  local c_count=0
+  while read -r line ; do
+    if [[ "${1:-}" == "raw_mysql" ]] ; then
+      echo "$line" # TODO: replace ^M with \n
+    elif [[ "$line" =~ ^name:\ (.+) ]] ; then
+      echo "${BASH_REMATCH[1]}"
+      c_count=$(( c_count + 1 ))
+    fi
+  done < <( mysql \
       --defaults-file=<(printf "[client]\npassword=%s\n" "$TCDBPASS") \
       --host="$TCDBHOST" \
       ${TCDBPORT+--port="$TCDBPORT"} \
@@ -214,13 +241,13 @@ function print_commands_usage() {
       --execute="SELECT name, help FROM command ORDER BY permission ASC, name ASC"
   )
 
-  if [[ $c_count -le 0 ]] ; then
-    # Example commands taken from 3.3.5a branch world.command table.
-    # TDB_full_335.62_2016_10_17
-    echo "  Unable to retrieve command line from world.command database table."
-    echo "  Displaying suggested commands from TDB_full_335.62_2016_10_17 instead."
-    echo ""
-    declare -a suggested_cmds=(
+  if [[ "${1:-}" != "raw_mysql" && $c_count -le 0 ]] ; then
+    get_fallback_commands
+  fi
+}
+
+function get_fallback_commands() {
+  declare -a available_cmds=(
       "rbac" "rbac account" "rbac account list" "rbac account grant"
       "rbac account deny" "rbac account revoke" "rbac list" "account"
       "account addon" "account create" "account delete" "account lock"
@@ -381,9 +408,43 @@ function print_commands_usage() {
       "server shutdown force" "server restart force" "debug neargraveyard"
       "go offset"
       )
-    for cmd in "${suggested_cmds[@]}" ; do
+  for cmd in "${available_cmds[@]}" ; do
+    echo "$cmd"
+  done
+}
+
+function print_commands_usage() {
+  local c_sect=""
+  local c_count=0
+
+  # TODO: Improve this to restrict the SQL select to only return those commands
+  #       that are actually permitted by the SOAP RPC API user in question.
+  while read -r line ; do
+    if [[ "$line" =~ \*\*\*\ [0-9]+\.\ row\ \*\*\* ]] ; then
+      if [[ "$c_sect" == "help" ]] ; then
+        echo ""
+      fi
+      c_sect=""
+    elif [[ "$line" =~ ^name:\ (.+) ]] ; then
+      echo "  ${BASH_REMATCH[1]}"
+      c_count=$(( c_count + 1 ))
+    elif [[ "$line" =~ ^help:\ (.+) ]] ; then
+      c_sect="help"
+      echo "    ${BASH_REMATCH[1]}"
+    elif [[ -n "$line" && "$line" =~ [a-zA-Z0-9] ]] ; then
+      echo "    ${line## }"
+    fi
+  done < <(get_available_commands raw_mysql)
+
+  if [[ $c_count -le 0 ]] ; then
+    # Example commands taken from 3.3.5a branch world.command table.
+    # TDB_full_335.62_2016_10_17
+    echo "  Unable to retrieve command line from world.command database table."
+    echo "  Displaying suggested commands from TDB_full_335.62_2016_10_17 instead."
+    echo ""
+    while read -r cmd ; do
       echo "  $cmd"
-    done
+    done < <(get_available_commands fallback)
   fi
 }
 
@@ -433,7 +494,7 @@ function execute_soap_query() {
 }
 
 function print_version() {
-  echo "${0##*/} v1.0"
+  echo "$PROG v1.0"
 }
 
 function main() {
@@ -441,23 +502,23 @@ function main() {
     case "$1" in
       --version|-version|-v) cmdarg_version=1 ;;
       --help|-help|-h|-?) cmdarg_help=1 ;;
-      --dbhost|-dbhost) TCDBHOST="$2"; shift ;;
+      --dbhost|-dbhost) TCDBHOST="${2:-}"; shift ;;
       --dbhost=*|-dbhost=*) TCDBHOST="${1#*=}" ;;
-      --dbport|-dbport) TCDBPORT="$2"; shift ;;
+      --dbport|-dbport) TCDBPORT="${2:-}"; shift ;;
       --dbport=*|-dbport=*) TCDBPORT="${1#*=}" ;;
-      --dbuser|-dbuser) TCDBUSER="$2"; shift ;;
+      --dbuser|-dbuser) TCDBUSER="${2:-}"; shift ;;
       --dbuser=*|-dbuser=*) TCDBUSER="${1#*=}" ;;
-      --dbpass|-dbpass) TCDBPASS="$2"; shift ;;
+      --dbpass|-dbpass) TCDBPASS="${2:-}"; shift ;;
       --dbpass=*|-dbpass=*) TCDBPASS="${1#*=}" ;;
-      --dbname|-dbname) TCDBNAME="$2"; shift ;;
+      --dbname|-dbname) TCDBNAME="${2:-}"; shift ;;
       --dbname=*|-dbname=*) TCDBNAME="${1#*=}" ;;
-      --soaphost|-soaphost) TCSOAPHOST="$2"; shift ;;
+      --soaphost|-soaphost) TCSOAPHOST="${2:-}"; shift ;;
       --soaphost=*|-soaphost=*) TCSOAPHOST="${1#*=}" ;;
-      --soapport|-soapport) TCSOAPPORT="$2"; shift ;;
+      --soapport|-soapport) TCSOAPPORT="${2:-}"; shift ;;
       --soapport=*|-soapport=*) TCSOAPPORT="${1#*=}" ;;
-      --soapuser|-soapuser) TCSOAPUSER="$2"; shift ;;
+      --soapuser|-soapuser) TCSOAPUSER="${2:-}"; shift ;;
       --soapuser=*|-soapuser=*) TCSOAPUSER="${1#*=}" ;;
-      --soappass|-soappass) TCSOAPPASS="$2"; shift ;;
+      --soappass|-soappass) TCSOAPPASS="${2:-}"; shift ;;
       --soappass=*|-soappass=*) TCSOAPPASS="${1#*=}" ;;
       *) >&2 echo "Unexpected argument $1." ;;
     esac
@@ -488,7 +549,7 @@ function main() {
 }
 
 # Only run main function if we're executed directly.
-if [[ "$(readlink -f "$0")" == "$(readlink -f "${BASH_SOURCE[0]}")" ]] ; then
+if [[ -f "$0" && "$(readlink -f -- "$0")" == "$(readlink -f -- "${BASH_SOURCE[0]}")" ]] ; then
   set -euo pipefail
   main "$@"
   exit $?
