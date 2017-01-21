@@ -1,0 +1,484 @@
+#!/bin/bash
+#
+# Trinity Core worldserver administrative command line OAP interface.
+#
+# This script relies on the curl and xml2 commands, and optionally mysql.
+#
+# Author: Nicola Worthington
+#         <nicolaw@tfb.net>
+#         https://nicolaw.uk
+#         https://github.com/neechbear
+#
+# MIT License
+#
+# Copyright (c) 2017 Nicola Worthington <nicolaw@tfb.net>
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+
+# Define default database values.
+declare TCDBHOST_DEFAULT="localhost"
+declare TCDBPORT_DEFAULT="3306"
+declare TCDBUSER_DEFAULT="tcadmin"
+declare TCDBPASS_DEFAULT="tcadmin"
+declare TCDBNAME_DEFAULT="world"
+
+if [[ ! -n "${TCDBHOST+Defined}" ]] ; then
+  declare TCDBHOST="$TCDBHOST_DEFAULT"
+fi
+if [[ ! -n "${TCDBPORT+Defined}" ]] ; then
+  declare TCDBPORT="$TCDBPORT_DEFAULT"
+fi
+if [[ ! -n "${TCDBUSER+Defined}" ]] ; then
+  declare TCDBUSER="$TCDBUSER_DEFAULT"
+fi
+if [[ ! -n "${TCDBPASS+Defined}" ]] ; then
+  declare TCDBPASS="$TCDBPASS_DEFAULT"
+fi
+if [[ ! -n "${TCDBNAME+Defined}" ]] ; then
+  declare TCDBNAME="$TCDBNAME_DEFAULT"
+fi
+
+# Define default SOAP values.
+declare TCSOAPHOST_DEFAULT="localhost"
+declare TCSOAPPORT_DEFAULT="7878"
+declare TCSOAPUSER_DEFAULT="tcadmin"
+declare TCSOAPPASS_DEFAULT="tcadmin"
+
+if [[ ! -n "${TCSOAPHOST+Defined}" ]] ; then
+  declare TCSOAPHOST="$TCSOAPHOST_DEFAULT"
+fi
+if [[ ! -n "${TCSOAPPORT+Defined}" ]] ; then
+  declare TCSOAPPORT="$TCSOAPPORT_DEFAULT"
+fi
+if [[ ! -n "${TCSOAPUSER+Defined}" ]] ; then
+  declare TCSOAPUSER="$TCSOAPUSER_DEFAULT"
+fi
+if [[ ! -n "${TCSOAPPASS+Defined}" ]] ; then
+  declare TCSOAPPASS="$TCSOAPPASS_DEFAULT"
+fi
+
+# Source in default configuration files if readable. These are intended for
+# administrators or users to overload the the above default variables.
+if [[ -r "/etc/default/${0##*/}" ]] ; then
+  # /etc/default/tcadmin
+  source "/etc/default/${0##*/}"
+fi
+if [[ -r ~/."${0##*/}.cnf" ]] ; then
+  # ~/.tcadmin.cnf
+  source ~/."${0##*/}.cnf"
+fi
+
+function print_usage() {
+  cat <<EOM
+${0##*/} - Trinity Core World Server Administration Tool
+
+Usage: ${0##*/} [db_args] [soap_args] <--help|--version|command> [options]
+
+DB Arguments:
+  Optional arguments to specify Trinity Core database paramaters. These are
+  used query the world database to provide better command line help and
+  validation.
+
+  --dbhost=<host>     Specify database hostname or IP.  Defaults to
+                      '$TCDBHOST_DEFAULT' or \$TCDBHOST environment variable.
+                    
+  --dbport=<port>     Specify database TCP port number.  Defaults to
+                      '$TCDBPORT_DEFAULT' or \$TCDBPORT environment variable.
+                    
+  --dbuser=<user>     Specify database username.  Defaults to
+                      '$TCDBUSER_DEFAULT' or \$TCDBUSER environment variable.
+
+  --dbpass=<pass>     Specify database password.  Defaults to
+                      '$TCDBPASS_DEFAULT' or \$TCDBPASS environment variable.
+
+  --dbname=<name>     Specify world database name.  Defaults to
+                      '$TCDBNAME_DEFAULT' or \$TCDBNAME environment variable.
+
+  See "Configuring Database Credentials" below for instructions on how to
+  configure read-only database access.
+
+SOAP Arguments:
+  Optional arguments to specify Trinity Core worlserver SOAP RPC API interface
+  connection information.
+
+  --soaphost=<host>   Specify SOAP RPC API hostname or IP.  Defaults to
+                      '$TCSOAPHOST_DEFAULT' or \$TCSOAPHOST environment variable.
+                    
+  --soapport=<port>   Specify SOAP RPC API TCP port number.  Defaults to
+                      '$TCSOAPPORT_DEFAULT' or \$TCSOAPPORT environment variable.
+                    
+  --soapuser=<user>   Specify SOAP RPC API username.  Defaults to
+                      '$TCSOAPUSER_DEFAULT' or \$TCSOAPUSER environment variable.
+
+  --soappass=<pass>   Specify SOAP RPC API password.  Defaults to
+                      '$TCSOAPPASS_DEFAULT' or \$TCSOAPPASS environment variable.
+
+  This command communicates with the Trinity Core worldserver process via the
+  SOAP RPC API. Ensure SOAP.Enabled, SOAP.IP and SOAP.Port are configured
+  correctly in your worldserver configuration file, and that these values are
+  reflected in these SOAP arguments if they differ from the indicated default.
+
+  See "Configuring SOAP RPC API Credentials" below for instuctions on how to
+  configure access.
+
+Commands:
+$(print_commands_usage) 
+
+Configuring Database Credentials:
+  To grant the minimal required read-only (SELECT) database permissions, modify
+  as necessary and then run following command against your MySQL database:
+
+  mysql -u root -p -e "
+    CREATE USER '${TCDBUSER}'@'${TCDBHOST}' IDENTIFIED BY '${TCDBPASS}';
+    GRANT SELECT ON ${TCDBNAME}.command TO '${TCDBUSER}'@'${TCDBHOST}';
+    FLUSH PRIVILEGES;"
+
+Configuring SOAP RPC API Credentials:
+  TODO - describe creating an rbac SOASOAPer.
+
+Environment Variables:
+  TCDBHOST, TCDBPORT, TCDBUSER, TCDBPASS, TCDBNAME, TCSOAPHOST, TCSOAPPORT,
+  TCSOAPUSER, TCSOAPPASS.
+
+  These variables may either be overloaded by writing them as KEY=VALUE pairs
+  in one of the configuration files listed below (the files are simply loaded
+  by the bash source command), or by specifying their values on the command
+  line (see "DB Arguments" and "SOAP Arguments" above).
+
+Configuration Files:
+  /etc/default/${0##*/}
+  ~/.${0##*/}.cnf
+
+For additional support and bug reports, please contact the author Nicola
+Worthington at <nicolaw@tfb.net>. Also see https://nicolaw.uk or
+https://github.com/neechbear.
+
+EOM
+}
+
+function print_commands_usage() {
+  local c_sect=""
+  local c_count=0
+
+  # TODO: Improve this to restrict the SQL select to only return those commands
+  #       that are actually permitted by the SOAP RPC API user in question.
+  while read -r line ; do
+    if [[ "$line" =~ \*\*\*\ [0-9]+\.\ row\ \*\*\* ]] ; then
+      if [[ "$c_sect" == "help" ]] ; then
+        echo ""
+      fi
+      c_sect=""
+    elif [[ "$line" =~ ^name:\ (.+) ]] ; then
+      echo "  ${BASH_REMATCH[1]}"
+      c_count=$(( c_count + 1 ))
+    elif [[ "$line" =~ ^help:\ (.+) ]] ; then
+      c_sect="help"
+      echo "    ${BASH_REMATCH[1]}"
+    elif [[ -n "$line" && "$line" =~ [a-zA-Z0-9] ]] ; then
+      echo "    ${line## }"
+    fi
+  done < <(
+    mysql \
+      --defaults-file=<(printf "[client]\npassword=%s\n" "$TCDBPASS") \
+      --host="$TCDBHOST" \
+      ${TCDBPORT+--port="$TCDBPORT"} \
+      --user="$TCDBUSER" \
+      --database="$TCDBNAME" \
+      --vertical \
+      --execute="SELECT name, help FROM command ORDER BY permission ASC, name ASC"
+  )
+
+  if [[ $c_count -le 0 ]] ; then
+    # Example commands taken from 3.3.5a branch world.command table.
+    # TDB_full_335.62_2016_10_17
+    echo "  Unable to retrieve command line from world.command database table."
+    echo "  Displaying suggested commands from TDB_full_335.62_2016_10_17 instead."
+    echo ""
+    declare -a suggested_cmds=(
+      "rbac" "rbac account" "rbac account list" "rbac account grant"
+      "rbac account deny" "rbac account revoke" "rbac list" "account"
+      "account addon" "account create" "account delete" "account lock"
+      "account lock country" "account lock ip" "account onlinelist"
+      "account password" "account set" "account set addon" "account set gmlevel"
+      "account set password" "achievement" "achievement add" "arena"
+      "arena captain" "arena create" "arena disband" "arena info" "arena lookup"
+      "arena rename" "ban" "ban account" "ban character" "ban ip"
+      "ban playeraccount" "baninfo" "baninfo account" "baninfo character"
+      "baninfo ip" "banlist" "banlist account" "banlist character" "banlist ip"
+      "unban" "unban account" "unban character" "unban ip"
+      "unban playeraccount" "bf" "bf start" "bf stop" "bf switch" "bf timer"
+      "bf enable" "account email" "account set sec" "account set sec email"
+      "account set sec regmail" "cast" "cast back" "cast dist" "cast self"
+      "cast target" "cast dest" "character" "character customize"
+      "character changefaction" "character changerace" "character deleted"
+      "character deleted delete" "character deleted list"
+      "character deleted restore" "character deleted old" "character erase"
+      "character level" "character rename" "character reputation"
+      "character titles" "levelup" "pdump" "pdump load" "pdump write" "cheat"
+      "cheat casttime" "cheat cooldown" "cheat explore" "cheat god"
+      "cheat power" "cheat status" "cheat taxi" "cheat waterwalk" "debug"
+      "debug anim" "debug areatriggers" "debug arena" "debug bg"
+      "debug entervehicle" "debug getitemstate" "debug getitemvalue"
+      "debug getvalue" "debug hostil" "debug itemexpire" "debug lootrecipient"
+      "debug los" "debug Mod32Value" "debug moveflags" "debug play"
+      "debug play cinematic" "debug play movie" "debug play sound" "debug send"
+      "debug send buyerror" "debug send channelnotify" "debug send chatmessage"
+      "debug send equiperror" "debug send largepacket" "debug send opcode"
+      "debug send qinvalidmsg" "debug send qpartymsg" "debug send sellerror"
+      "debug send setphaseshift" "debug send spellfail" "debug setaurastate"
+      "debug setbit" "debug setitemvalue" "debug setvalue" "debug setvid"
+      "debug spawnvehicle" "debug threat" "debug update" "debug uws" "wpgps"
+      "deserter" "deserter bg" "deserter bg add" "deserter bg remove"
+      "deserter instance" "deserter instance add" "deserter instance remove"
+      "disable" "disable add" "disable add achievement_criteria"
+      "disable add battleground" "disable add map" "disable add mmap"
+      "disable add outdoorpvp" "disable add quest" "disable add spell"
+      "disable add vmap" "disable remove" "disable remove achievement_criteria"
+      "disable remove battleground" "disable remove map" "disable remove mmap"
+      "disable remove outdoorpvp" "disable remove quest" "disable remove spell"
+      "disable remove vmap" "event info" "event activelist" "event start"
+      "event stop" "gm" "gm chat" "gm fly" "gm ingame" "gm list" "gm visible"
+      "go creature" "go graveyard" "go grid" "go object" "go taxinode"
+      "go ticket" "go trigger" "go xyz" "go zonexy" "gobject" "gobject activate"
+      "gobject add" "gobject add temp" "gobject delete" "gobject info"
+      "gobject move" "gobject near" "gobject set" "gobject set phase"
+      "gobject set state" "gobject target" "gobject turn" "debug transport"
+      "guild" "guild create" "guild delete" "guild invite" "guild uninvite"
+      "guild rank" "guild rename" "honor" "honor add" "honor add kill"
+      "honor update" "instance" "instance listbinds" "debug raidreset"
+      "instance unbind" "instance stats" "instance savedata" "learn" "learn all"
+      "learn all my" "learn all my class" "learn all my pettalents"
+      "learn all my spells" "learn all my talents" "learn all gm"
+      "learn all crafts" "learn all default" "learn all lang"
+      "learn all recipes" "unlearn" "lfg" "lfg player" "lfg group" "lfg queue"
+      "lfg clean" "lfg options" "list" "list creature" "list item" "list object"
+      "list auras" "list mail" "lookup" "lookup area" "lookup creature"
+      "lookup event" "lookup faction" "lookup item" "lookup itemset"
+      "lookup object" "lookup quest" "lookup player" "lookup player ip"
+      "lookup player account" "lookup player email" "lookup skill"
+      "lookup spell" "lookup spell id" "lookup taxinode" "lookup tele"
+      "lookup title" "lookup map" "announce" "channel" "channel set"
+      "channel set ownership" "gmannounce" "gmnameannounce" "gmnotify"
+      "nameannounce" "notify" "whispers" "group" "group leader" "group disband"
+      "group remove" "group join" "group list" "group summon" "pet" "pet create"
+      "pet learn" "pet unlearn" "send" "send items" "send mail" "send message"
+      "send money" "additem" "additemset" "appear" "aura" "bank" "bindsight"
+      "combatstop" "cometome" "commands" "cooldown" "damage" "dev" "die"
+      "dismount" "distance" "flusharenapoints" "freeze" "gps" "guid" "help"
+      "hidearea" "itemmove" "kick" "linkgrave" "listfreeze" "maxskill"
+      "movegens" "mute" "neargrave" "pinfo" "playall" "possess" "recall"
+      "repairitems" "respawn" "revive" "saveall" "save" "setskill" "showarea"
+      "summon" "unaura" "unbindsight" "unfreeze" "unmute" "unpossess" "unstuck"
+      "wchange" "mmap" "mmap loadedtiles" "mmap loc" "mmap path" "mmap stats"
+      "mmap testarea" "morph" "demorph" "modify" "modify arenapoints"
+      "modify bit" "modify drunk" "modify energy" "modify faction"
+      "modify gender" "modify honor" "modify hp" "modify mana" "modify money"
+      "modify mount" "modify phase" "modify rage" "modify reputation"
+      "modify runicpower" "modify scale" "modify speed" "modify speed all"
+      "modify speed backwalk" "modify speed fly" "modify speed walk"
+      "modify speed swim" "modify spell" "modify standstate"
+      "modify talentpoints" "npc" "npc add" "npc add formation" "npc add item"
+      "npc add move" "npc add temp" "npc delete" "npc delete item" "npc follow"
+      "npc follow stop" "npc set" "npc set allowmove" "npc set entry"
+      "npc set factionid" "npc set flag" "npc set level" "npc set link"
+      "npc set model" "npc set movetype" "npc set phase" "npc set spawndist"
+      "npc set spawntime" "npc set data" "npc info" "npc near" "npc move"
+      "npc playemote" "npc say" "npc textemote" "npc whisper" "npc yell"
+      "npc tame" "quest" "quest add" "quest complete" "quest remove"
+      "quest reward" "reload" "reload access_requirement"
+      "reload achievement_criteria_data" "reload achievement_reward"
+      "reload all" "reload all achievement" "reload all area"
+      "reload broadcast_text" "reload all gossips" "reload all item"
+      "reload all locales" "reload all loot" "reload all npc" "reload all quest"
+      "reload all scripts" "reload all spell"
+      "reload areatrigger_involvedrelation" "reload areatrigger_tavern"
+      "reload areatrigger_teleport" "reload auctions" "reload autobroadcast"
+      "reload command" "reload conditions" "reload config"
+      "reload battleground_template" "mutehistory"
+      "reload creature_linked_respawn" "reload creature_loot_template"
+      "reload creature_onkill_reputation" "reload creature_questender"
+      "reload creature_queststarter" "reload creature_summon_groups"
+      "reload creature_template" "reload creature_text" "reload disables"
+      "reload disenchant_loot_template" "reload event_scripts"
+      "reload fishing_loot_template" "reload graveyard_zone" "reload game_tele"
+      "reload gameobject_questender" "reload gameobject_loot_template"
+      "reload gameobject_queststarter" "reload gm_tickets" "reload gossip_menu"
+      "reload gossip_menu_option" "reload item_enchantment_template"
+      "reload item_loot_template" "reload item_set_names"
+      "reload lfg_dungeon_rewards" "reload locales_achievement_reward"
+      "reload locales_creature" "reload locales_creature_text"
+      "reload locales_gameobject" "reload locales_gossip_menu_option"
+      "reload locales_item" "reload locales_item_set_name"
+      "reload locales_npc_text" "reload locales_page_text"
+      "reload locales_points_of_interest" "reload locales_quest"
+      "reload mail_level_reward" "reload mail_loot_template"
+      "reload milling_loot_template" "reload npc_spellclick_spells"
+      "reload npc_trainer" "reload npc_vendor" "reload page_text"
+      "reload pickpocketing_loot_template" "reload points_of_interest"
+      "reload prospecting_loot_template" "reload quest_poi"
+      "reload quest_template" "reload rbac" "reload reference_loot_template"
+      "reload reserved_name" "reload reputation_reward_rate"
+      "reload reputation_spillover_template" "reload skill_discovery_template"
+      "reload skill_extra_item_template" "reload skill_fishing_base_level"
+      "reload skinning_loot_template" "reload smart_scripts"
+      "reload spell_required" "reload spell_area" "reload spell_bonus_data"
+      "reload spell_group" "reload spell_learn_spell"
+      "reload spell_loot_template" "reload spell_linked_spell"
+      "reload spell_pet_auras" "character changeaccount" "reload spell_proc"
+      "reload spell_scripts" "reload spell_target_position"
+      "reload spell_threats" "reload spell_group_stack_rules"
+      "reload trinity_string" "reload warden_action" "reload waypoint_scripts"
+      "reload waypoint_data" "reload vehicle_accessory"
+      "reload vehicle_template_accessory" "reset" "reset achievements"
+      "reset honor" "reset level" "reset spells" "reset stats" "reset talents"
+      "reset all" "server" "server corpses" "server exit" "server idlerestart"
+      "server idlerestart cancel" "server idleshutdown"
+      "server idleshutdown cancel" "server info" "server plimit"
+      "server restart" "server restart cancel" "server set" "server set closed"
+      "server set difftime" "server set loglevel" "server set motd"
+      "server shutdown" "server shutdown cancel" "server motd" "tele" "tele add"
+      "tele del" "tele name" "tele group" "ticket" "ticket assign"
+      "ticket close" "ticket closedlist" "ticket comment" "ticket complete"
+      "ticket delete" "ticket escalate" "ticket escalatedlist" "ticket list"
+      "ticket onlinelist" "ticket reset" "ticket response"
+      "ticket response append" "ticket response appendln" "ticket togglesystem"
+      "ticket unassign" "ticket viewid" "ticket viewname" "titles" "titles add"
+      "titles current" "titles remove" "titles set" "titles set mask" "wp"
+      "wp add" "wp event" "wp load" "wp modify" "wp unload" "wp reload"
+      "wp show" "mailbox" "ahbot" "ahbot items" "ahbot items gray"
+      "ahbot items white" "ahbot items green" "ahbot items blue"
+      "ahbot items purple" "ahbot items orange" "ahbot items yellow"
+      "ahbot ratio" "ahbot ratio alliance" "ahbot ratio horde"
+      "ahbot ratio neutral" "ahbot rebuild" "ahbot reload" "ahbot status"
+      "guild info" "instance setbossstate" "instance getbossstate" "pvpstats"
+      "modify xp" "debug loadcells" "debug boundary" "npc evade" "pet level"
+      "server shutdown force" "server restart force" "debug neargraveyard"
+      "go offset"
+      )
+    for cmd in "${suggested_cmds[@]}" ; do
+      echo "  $cmd"
+    done
+  fi
+}
+
+function generate_soap_query_xml() {
+  cat <<EOM
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns1="urn:TC" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:SOAP-ENC="http://schemas.xmlsoap.org/soap/encoding/" SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<SOAP-ENV:Body>
+<ns1:executeCommand>
+<command xsi:type="xsd:string">$@</command>
+</ns1:executeCommand>
+</SOAP-ENV:Body>
+</SOAP-ENV:Envelope>
+EOM
+}
+
+function execute_soap_query() {
+  local res="" rc=0
+  local soap_fault='/SOAP-ENV:Envelope/SOAP-ENV:Body/SOAP-ENV:Fault/'
+  local soap_result='/SOAP-ENV:Envelope/SOAP-ENV:Body/ns1:executeCommandResponse/result'
+
+  res="$(curl -s \
+    --user-agent "$(print_version)" \
+    --user "${TCSOAPUSER}${TCSOAPPASS+:$TCSOAPPASS}" \
+    --header "Content-Type: text/xml;charset=UTF-8" \
+    --header "SOAPAction:urn:TC#executeCommand" \
+    --data @<(generate_soap_query_xml "$@") \
+    "http://${TCSOAPHOST}:${TCSOAPPORT}/" | xml2)" || rc=$?
+
+  if [[ $rc -eq 0 \
+      && ! "$res" =~ $soap_fault \
+      && ! "$res" =~ $soap_result=There\ is\ no\ such\ (sub)?command ]] ; then
+    while read -r line ; do
+      if [[ "$line" =~ $soap_result=(.*) ]] ; then
+        echo "${BASH_REMATCH[1]}"
+      fi
+    done < <(echo "$res")
+
+  else
+    if [[ $rc -eq 0 ]] ; then
+      rc=1
+    fi
+    egrep "($soap_fault|$soap_result=.+)" <<< "$res" >&2 \
+      || >&2 echo "Failed to query remote SOAP RPC API."
+    return $rc
+  fi
+}
+
+function print_version() {
+  echo "${0##*/} v1.0"
+}
+
+function main() {
+  while [[ $# -ge 1 && "$1" == "-"* ]] ; do
+    case "$1" in
+      --version|-version|-v) cmdarg_version=1 ;;
+      --help|-help|-h|-?) cmdarg_help=1 ;;
+      --dbhost|-dbhost) TCDBHOST="$2"; shift ;;
+      --dbhost=*|-dbhost=*) TCDBHOST="${1#*=}" ;;
+      --dbport|-dbport) TCDBPORT="$2"; shift ;;
+      --dbport=*|-dbport=*) TCDBPORT="${1#*=}" ;;
+      --dbuser|-dbuser) TCDBUSER="$2"; shift ;;
+      --dbuser=*|-dbuser=*) TCDBUSER="${1#*=}" ;;
+      --dbpass|-dbpass) TCDBPASS="$2"; shift ;;
+      --dbpass=*|-dbpass=*) TCDBPASS="${1#*=}" ;;
+      --dbname|-dbname) TCDBNAME="$2"; shift ;;
+      --dbname=*|-dbname=*) TCDBNAME="${1#*=}" ;;
+      --soaphost|-soaphost) TCSOAPHOST="$2"; shift ;;
+      --soaphost=*|-soaphost=*) TCSOAPHOST="${1#*=}" ;;
+      --soapport|-soapport) TCSOAPPORT="$2"; shift ;;
+      --soapport=*|-soapport=*) TCSOAPPORT="${1#*=}" ;;
+      --soapuser|-soapuser) TCSOAPUSER="$2"; shift ;;
+      --soapuser=*|-soapuser=*) TCSOAPUSER="${1#*=}" ;;
+      --soappass|-soappass) TCSOAPPASS="$2"; shift ;;
+      --soappass=*|-soappass=*) TCSOAPPASS="${1#*=}" ;;
+      *) >&2 echo "Unexpected argument $1." ;;
+    esac
+    shift
+  done
+
+  if [[ -n "${cmdarg_version:+Defined}" ]] ; then
+    print_version
+    exit 0
+
+  elif [[ -n "${cmdarg_help:+Defined}" || $# -le 0 ]] ; then
+    if [[ -z "${PAGER:-}" ]] ; then
+      PAGER="$(type -p less)"
+      if [[ -n "${PAGER:-}" && -x "$PAGER" ]] ; then
+        print_usage | "$PAGER"
+      else
+        print_usage
+      fi
+    fi
+    exit 0
+  fi
+
+  execute_soap_query "$@"
+}
+
+# Only run main function if we're executed directly.
+if [[ "$(readlink -f "$0")" == "$(readlink -f "${BASH_SOURCE[0]}")" ]] ; then
+  set -euo pipefail
+  main "$@"
+  exit $?
+fi
+
+
