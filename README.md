@@ -124,7 +124,7 @@ DB Arguments:
   configure read-only database access.
 
 SOAP Arguments:
-  Optional arguments to specify Trinity Core worlserver SOAP RPC API interface
+  Optional arguments to specify Trinity Core worldserver SOAP RPC API interface
   connection information.
 
   --soaphost=<host>   Specify SOAP RPC API hostname or IP.  Defaults to
