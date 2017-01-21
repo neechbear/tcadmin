@@ -5,8 +5,9 @@ This script requires that you have the worldserver SOAP RPC API enabled, and tha
 
 ## TODO
 
- * Make command help only display help for commands that you have permissions to execute.
  * Attempt to pull command help from SOAP RPC API before trying MySQL query, before falling back to hard-coded internal list.
+   * This is necessary as the current command list is ALL commands (many of which are not relevent or available via the SOAP interface)!
+   * Make command help only display help for commands that you have permissions to execute.
  * Make sub-command help display if you enter incorrect syntax or invalid arguments.
  * Improve bash autocompletion to understand command arguments in order to perform context sensitive spell, item and skill ID lookups etc for you.
  * Try and remove `xml2` and `sed` dependency.
