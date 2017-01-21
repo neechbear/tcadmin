@@ -3,6 +3,19 @@ TrinityCore Administrative Command Line Tool
 
 This script requires that you have the worldserver SOAP RPC API enabled, and that you have the `curl` and `xml2` commands available. There is an optional dependency upon the `mysql` client.
 
+## TODO
+
+ * Make command help only display help for commands that you have permissions to execute.
+ * Attempt to pull command help from SOAP RPC API before trying MySQL query, before falling back to hard-coded internal list.
+ * Make sub-command help display if you enter incorrect syntax or invalid arguments.
+ * Write bash autocompletion so that you can build a full command line with tab completion that looks up commands, subcommands, players, items, spells etc for you.
+ * Try and remove `xml2` and `sed` dependency.
+ * Document use of the script as a library (which is already possible simply by sourcing the script from another bash script and calling the appropriate functions yourself).
+ * Document some interesting examples of use from your crontab.
+ * Remove ^M characters from database output.
+
+## Example Usage
+
 ```
 nicolaw@qp:~$ tcadmin lookup item Shadowmourn
 50815 - Shadowmourne Monster Offhand
