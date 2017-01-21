@@ -151,7 +151,14 @@ Configuring Database Credentials:
     FLUSH PRIVILEGES;"
 
 Configuring SOAP RPC API Credentials:
-  TODO - describe creating an rbac SOASOAPer.
+  From the worldsever console, execute the following commands:
+
+  account create $TCSOAPUSER ${TCSOAPPASS:-yourpasswordhere}
+  account set gmlevel $TCSOAPUSER 3 -1
+
+  See the following URL for additional instructions on creating a GM user
+  suitable for use with the SOAP RPC API:
+    https://trinitycore.atlassian.net/wiki/display/tc/Server+Setup
 
 Environment Variables:
   TCDBHOST, TCDBPORT, TCDBUSER, TCDBPASS, TCDBNAME, TCSOAPHOST, TCSOAPPORT,
@@ -167,9 +174,11 @@ Configuration Files:
   ~/.${0##*/}.cnf
 
 For additional support and bug reports, please contact the author Nicola
-Worthington at <nicolaw@tfb.net>. Also see https://nicolaw.uk or
-https://github.com/neechbear.
+Worthington at <nicolaw@tfb.net>.
 
+Also see https://nicolaw.uk, https://github.com/neechbear,
+https://trinitycore.atlassian.net/wiki/display/tc/GM+Commands and
+https://trinitycore.atlassian.net/wiki/display/tc/Server+Setup.
 EOM
 }
 
