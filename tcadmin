@@ -93,7 +93,7 @@ Usage: ${0##*/} [db_args] [soap_args] <--help|--version|command> [options]
 
 DB Arguments:
   Optional arguments to specify Trinity Core database paramaters. These are
-  used query the world database to provide better command line help and
+  used to query the world database to provide better command line help and
   validation.
 
   --dbhost=<host>     Specify database hostname or IP.  Defaults to
